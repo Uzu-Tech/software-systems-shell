@@ -1,9 +1,10 @@
 #include "s3.h"
+#include <stdio.h>
 
 ///Simple for now, but will be expanded in a following section
 void construct_shell_prompt(char shell_prompt[])
 {
-    strcpy(shell_prompt, "[s3]$ ");
+    strcpy(shell_prompt, "\033[1;35m$hell\033[0m: ");
 }
 
 ///Prints a shell prompt and reads input from the user
