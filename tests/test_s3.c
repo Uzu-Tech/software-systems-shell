@@ -4,43 +4,22 @@
 #include <unistd.h>
 #include <errno.h>
 #include "s3.h"
+#include "test_helper.h"
 
 #define TEST_TIMEOUT_SECONDS 2.0
-#define MAX_LINE 100
 
-static int run_child_and_get_exit_code(char *args[], int argsc)
+
+Test(launcher, preserves_arguments, .timeout = TEST_TIMEOUT_SECONDS)
 {
-    pid_t pid = fork();
-    cr_assert_neq(pid, -1, "fork failed");
-
-    if (pid == 0) {
-        child(args, argsc);
-        _exit(99);  // Detect an unexpected return from child().
-    }
-
-    int status;
-    pid_t result;
-
-    do {
-        result = waitpid(pid, &status, 0);
-    } while (result == -1 && errno == EINTR);
-
-    cr_assert_eq(result, pid);
-    cr_assert(WIFEXITED(status), "Child terminated by a signal");
-
-    return WEXITSTATUS(status);
-}
-
-static void provide_input(const char *text)
-{
-    cr_redirect_stdin();
     cr_redirect_stdout();
 
-    FILE *input = cr_get_redirected_stdin();
-    cr_assert_not_null(input);
+    char *args[] = {
+        "printf", "[%s]\n", "hello world", "", "after", NULL
+    };
 
-    cr_assert_neq(fputs(text, input), EOF);
-    cr_assert_eq(fclose(input), 0);
+    launch_program(args, 5);
+
+    cr_assert_stdout_eq_str("[hello world]\n[]\n[after]\n");
 }
 
 // Test argument with gap passed correctly
@@ -76,10 +55,8 @@ Test(command_input, accepts_empty_line, .timeout = TEST_TIMEOUT_SECONDS)
     cr_assert_str_eq(line, "");
 }
 
-
 // read command line reads one line at a time
-Test(command_input, reads_one_line_at_a_time,
-     .timeout = TEST_TIMEOUT_SECONDS)
+Test(command_input, reads_one_line_at_a_time, .timeout = TEST_TIMEOUT_SECONDS)
 {
     provide_input("pwd\nls\n");
 
@@ -91,6 +68,16 @@ Test(command_input, reads_one_line_at_a_time,
 
     cr_assert_str_eq(first, "pwd");
     cr_assert_str_eq(second, "ls");
+}
+
+Test(command_input, preserves_last_character, .timeout = TEST_TIMEOUT_SECONDS)
+{
+    provide_input("pwd");
+
+    char line[MAX_LINE];
+    read_command_line(line);
+
+    cr_assert_str_eq(line, "pwd");
 }
 
 Test(parser, handles_extra_spaces, .timeout = TEST_TIMEOUT_SECONDS)
@@ -120,6 +107,32 @@ Test(parser, handles_empty_input, .timeout = TEST_TIMEOUT_SECONDS)
 
     cr_assert_eq(argsc, 0);
     cr_assert_null(args[0]);
+}
+
+Test(parser, limits_argument_count, .timeout = TEST_TIMEOUT_SECONDS)
+{
+    // Build MAX_ARGS tokens: one more than the parser accepts.
+    char line[2 * MAX_ARGS + 1];
+
+    for (int i = 0; i < MAX_ARGS; i++) {
+        line[2 * i] = 'x';
+        line[2 * i + 1] = ' ';
+    }
+    line[2 * MAX_ARGS] = '\0';
+
+    char *args[MAX_ARGS] = {NULL};
+    args[MAX_ARGS - 1] = line; // Detect a missing NULL terminator.
+    int argsc = -1;
+
+    parse_command(line, args, &argsc);
+
+    cr_assert_eq(argsc, MAX_ARGS - 1);
+
+    for (int i = 0; i < argsc; i++) {
+        cr_assert_str_eq(args[i], "x");
+    }
+
+    cr_assert_null(args[argsc]);
 }
 
 Test(child_process, runs_command, .timeout = TEST_TIMEOUT_SECONDS)
