@@ -21,7 +21,7 @@ void read_command_line(char line[])
         exit(1);
     }
     ///Remove newline (enter)
-    line[strlen(line) - 1] = '\0';
+    line[strcspn(line, "\n")] = '\0';
 }
 
 void parse_command(char line[], char *args[], int *argsc)
