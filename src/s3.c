@@ -7,7 +7,7 @@ void construct_shell_prompt(char shell_prompt[])
     strcpy(shell_prompt, "\033[1;35m$hell\033[0m: ");
 }
 
-///Prints a shell prompt and reads input from the user
+///Prints a shell prompt and    reads input from the user
 void read_command_line(char line[])
 {
     char shell_prompt[MAX_PROMPT_LEN];
@@ -55,14 +55,22 @@ void child(char *args[], int argsc)
 
 void launch_program(char *args[], int argsc)
 {
-    ///Implement this function:
+    pid_t rc = fork();
 
-    ///fork() a child process.
-    ///In the child part of the code,
-    ///call child(args, argv)
-    ///For reference, see the code in lecture 2.
+    if (rc < 0){ 
+        perror("fork has failed");
+        return;
+    }
+    else if (rc == 0){  //child process
+        child(args, argv);
+        exit(EXIT_FAILURE);    
+    }
+    else{ //parent process
+        int status;
+        if (waitpid(rc, &status, 0) < 0){
+            perror("waitpid");      
+        }    
+    }
 
-    ///Handle the 'exit' command;
-    ///so that the shell, not the child process,
-    ///exits.
+    return 0
 }
