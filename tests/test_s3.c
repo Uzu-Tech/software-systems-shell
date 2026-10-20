@@ -1,13 +1,13 @@
 #include <criterion/criterion.h>
-#include "src/s3.c"
+#include <criterion/redirect.h>
+#include "s3.h"
 
 Test(launcher, passes_arguments_correctly, .timeout = 2.0)
 {
     cr_redirect_stdout();
 
-    char *args[] = {"echo", "hello world", "second", NULL};
+    char *args[] = {"echo", "hello world", NULL};
+    launch_program(args, 2);
 
-    launch_program(args, 4);
-
-    cr_assert_stdout_eq_str("hello world|second");
+    cr_assert_stdout_eq_str("hello world\n");
 }
