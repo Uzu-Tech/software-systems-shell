@@ -61,7 +61,7 @@ void launch_program(char *args[], int argsc)
         return;
     }
     else if (rc == 0){  //child process
-        child(args, argv);
+        child(args, argsc);
         exit(EXIT_FAILURE);    
     }
     else{ //parent process
@@ -70,6 +70,4 @@ void launch_program(char *args[], int argsc)
             perror("waitpid");      
         }    
     }
-
-    return 0
 }
