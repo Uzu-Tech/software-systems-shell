@@ -1,5 +1,6 @@
 #include "s3.h"
 #include <stdio.h>
+#include "error_handling.h"
 
 ///Simple for now, but will be expanded in a following section
 void construct_shell_prompt(char shell_prompt[])
@@ -26,25 +27,21 @@ void read_command_line(char line[])
 
 void parse_command(char line[], char *args[], int *argsc)
 {
-    ///Implements simple tokenization (space delimited)
-    ///Note: strtok puts '\0' (null) characters within the existing storage, 
-    ///to split it into logical cstrings.
-    ///There is no dynamic allocation.
 
-    ///See the man page of strtok(...)
-    char *token = strtok(line, " ");
+    char *token = strtok(line, " "); //first space replaced with null terminator
     *argsc = 0;
     while (token != NULL && *argsc < MAX_ARGS - 1)
     {
-        args[(*argsc)++] = token;
+        args[*argsc] = token;
+        (*argsc)++; 
         token = strtok(NULL, " ");
     }
     
-    args[*argsc] = NULL; ///args must be null terminated
+    args[*argsc] = NULL; //args must be null terminated
 }
 
 ///Launch related functions
-void child(char *args[], int argsc)
+void child(char *args[])
 {
     if (execvp(args[0], args) < 0) {
         perror("execvp failed");
@@ -61,13 +58,43 @@ void launch_program(char *args[], int argsc)
         return;
     }
     else if (rc == 0){  //child process
-        child(args, argsc);
+        child(args);
         exit(EXIT_FAILURE);    
     }
     else{ //parent process
         int status;
-        if (waitpid(rc, &status, 0) < 0){
-            perror("waitpid");      
-        }    
+
+        if (waitpid(rc, &status, 0) == -1) {
+            handle_wait_error(rc);
+        }
+    }
+}
+
+void handle_wait_error(pid_t child_pid) {
+    switch (errno) {
+        case ECHILD:
+            fprintf(stderr, "No child process with %d as process Id.\n", child_pid);
+            break;
+        case EINTR:
+            fprintf(stderr, "Process %d interrupted by a signal.\n", child_pid);
+            break;
+        case EINVAL:
+            fprintf(stderr, "Process %d has an illegal value passed into system call.\n", child_pid);
+            break;
+        default:
+            perror("Wait failed with unknown error");
+            break;
+    }
+}
+
+void handle_child_error(int status){
+    if(WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        if (exit_code != 0) {
+            fprintf(stderr, "Process failed with exit code %d", exit_code);
+        }
+        else if (WIFSIGNALED(status)){
+            fprintf(stderr, "Process was killed by a signal %d\n", exit_code);
+        }
     }
 }

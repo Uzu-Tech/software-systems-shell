@@ -6,7 +6,7 @@ int run_child_and_get_exit_code(char *args[], int argsc)
     cr_assert_neq(pid, -1, "fork failed");
 
     if (pid == 0) {
-        child(args, argsc);
+        child(args);
         _exit(99);  // Detect an unexpected return from child().
     }
 
