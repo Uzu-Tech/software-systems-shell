@@ -1,4 +1,7 @@
 #include "s3.h"
+#include <fcntl.h>
+#include <stdlib.h>
+#include "redirect.h"
 #include <stdio.h>
 #include "error_handling.h"
 
@@ -42,13 +45,24 @@ void parse_command(char line[], char *args[], int *argsc)
     args[*argsc] = NULL; //args must be null terminated
 }
 
-///Launch related functions
-void child(char *args[])
-{
+void execute_program(char* args[]) {
     if (execvp(args[0], args) < 0) {
         perror("execvp failed");
         exit(EXIT_FAILURE);
     }
+}
+
+// Launch related functions
+void child(const ChildParams* params)
+{
+    if (params->infile != NULL) {
+        redirect_stdin(params->infile);
+    }
+    if (params->outfile != NULL) {
+        redirect_stdout(params->outfile);
+    }
+
+    execute_program(params->args);
 }
 
 void launch_program(char *args[], int argsc)
@@ -59,9 +73,18 @@ void launch_program(char *args[], int argsc)
         perror("fork has failed");
         return;
     }
+
     else if (rc == 0) {  // child process
-        child(args);
-        exit(EXIT_FAILURE); // Fallback in case code somehow passes   
+        ChildParams params = {
+            .args = args,
+            .infile = NULL,
+            .outfile = NULL
+        };
+
+        extract_redirect(params.args, &params.infile, &params.outfile);
+
+        child(&params);
+        exit(EXIT_FAILURE); // Fallback in case code somehow passes  
     }    
 
     else { // parent process

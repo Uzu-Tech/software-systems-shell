@@ -5,11 +5,11 @@
 #include <unistd.h>
 
 // Macros and functions in implement C++ RAII ideas in C
-void auto_free(void** p) {
+static inline void auto_free(void** p) {
     if (*p != NULL) { free(*p); }
 }
 
-void auto_close(int* fd) {
+static inline void auto_close(int* fd) {
     if (*fd >= 0) { close(*fd); }
 }
 

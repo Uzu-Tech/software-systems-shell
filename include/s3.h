@@ -11,7 +11,7 @@
 
 
 ///Constants for array sizes, defined for clarity and code readability
-#define MAX_LINE 10
+#define MAX_LINE 1024
 #define MAX_ARGS 128
 #define MAX_PROMPT_LEN 256
 #define PROMPT_TEXT "\033[1;35m$hell\033[0m: "
@@ -40,6 +40,12 @@ void construct_shell_prompt(char shell_prompt[]);
 void parse_command(char line[], char *args[], int *argsc);
 
 ///Child functions (add more as appropriate)
-void child(char *args[]);
+typedef struct {
+    char **args;
+    char* infile;
+    char* outfile;
+} ChildParams;
+
+void child(const ChildParams* params);
 ///Program launching functions (add more as appropriate)
 void launch_program(char *args[], int argsc);
