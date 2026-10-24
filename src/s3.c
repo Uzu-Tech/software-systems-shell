@@ -5,7 +5,7 @@
 ///Simple for now, but will be expanded in a following section
 void construct_shell_prompt(char shell_prompt[])
 {
-    strcpy(shell_prompt, "\033[1;35m$hell\033[0m: ");
+    strcpy(shell_prompt, PROMPT_TEXT);
 }
 
 ///Prints a shell prompt and    reads input from the user
@@ -23,6 +23,8 @@ void read_command_line(char line[])
     }
     ///Remove newline (enter)
     line[strcspn(line, "\n")] = '\0';
+
+    // "echo\0hello\0world \0"
 }
 
 void parse_command(char line[], char *args[], int *argsc)
@@ -53,15 +55,16 @@ void launch_program(char *args[], int argsc)
 {
     pid_t rc = fork();
 
-    if (rc < 0){ 
+    if (rc < 0) { 
         perror("fork has failed");
         return;
     }
-    else if (rc == 0){  //child process
+    else if (rc == 0) {  // child process
         child(args);
-        exit(EXIT_FAILURE);    
-    }
-    else{ //parent process
+        exit(EXIT_FAILURE); // Fallback in case code somehow passes   
+    }    
+
+    else { // parent process
         int status;
 
         if (waitpid(rc, &status, 0) == -1) {
