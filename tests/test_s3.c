@@ -2,7 +2,6 @@
 #include <criterion/redirect.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <errno.h>
 #include "s3.h"
 #include "test_helper.h"
 

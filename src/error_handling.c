@@ -1,4 +1,6 @@
 #include "error_handling.h"
+#include <errno.h>
+#include <stdio.h>
 
 void handle_wait_error(pid_t child_pid) {
     switch (errno) {
