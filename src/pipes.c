@@ -1,38 +1,30 @@
 #include "pipes.h"
 
-int split_on_pipe(char *line, char **left_str, char **right_str) {
-    char *pipe_ptr = strchr(line, '|');
-    if (pipe_ptr == NULL) {
-        return 0;
-    }
-
-    *pipe_ptr = '\0';
-    *left_str = line;
-    *right_str = pipe_ptr + 1;
-
-    if (**left_str == '\0' || **right_str == '\0') {
-        fprintf(stderr, "Syntax error near unexpected token '|'\n");
-        return -1;
-    }
-
-    return 1;
+static int split_on_pipes(char *line, char *parts[]) {
+    return split_string(line, parts, MAX_COMMANDS + 1, '|', true);
 }
 
-int prepare_pipeline_args(char *left_str, char *right_str, char *args1[], char *args2[]) {
-    int argsc1 = 0;
-    int argsc2 = 0;
+static int prepare_pipeline_args(char *parts[], char *args[][MAX_ARGS], int count) {
+    for (int i = 0; i < count; i++) {
+        int argsc = 0;
 
-    parse_command(left_str, args1, &argsc1);
-    parse_command(right_str, args2, &argsc2);
+        parse_command(parts[i], args[i], &argsc);
 
-    if (argsc1 == 0 || argsc2 == 0) {
-        fprintf(stderr, "Syntax error: missing command near '|'\n");
-        return -1;
+        if (argsc < 0) {
+            fprintf(stderr, "Too many arguments in pipeline command\n");
+            return -1;
+        }
+
+        if (argsc == 0) {
+            fprintf(stderr, "Syntax error: missing command near '|'\n");
+            return -1;
+        }
     }
-    return 0; 
+
+    return 0;
 }
 
-int create_pipe(int pipefd[2]) {
+static int create_pipe(int pipefd[2]) {
     if (pipe(pipefd) < 0) {
         perror("pipe failed");
         return -1;
@@ -40,22 +32,31 @@ int create_pipe(int pipefd[2]) {
     return 0;
 }
 
-void close_pipe(int pipefd[2]) {
+static void close_pipe(int pipefd[2]) {
     close(pipefd[0]);
     close(pipefd[1]);
 }
 
-void redirect_pipe_writer(int pipefd[2]) {
-    dup2(pipefd[1], STDOUT_FILENO);
-    close_pipe(pipefd);
+static void close_pipeline_pipes(int pipes[][2], int count) {
+    for (int i = 0; i < count; i++) {
+        close_pipe(pipes[i]);
+    }
 }
 
-void redirect_pipe_reader(int pipefd[2]) {
-    dup2(pipefd[0], STDIN_FILENO);
-    close_pipe(pipefd);
+static int redirect_pipe_child(int pipes[][2], int pipe_count, int command_index) {
+    if (command_index > 0) {
+        if (dup2(pipes[command_index - 1][0], STDIN_FILENO) < 0) {
+            return -1;
+        }
+    }
+    if (command_index < pipe_count) {
+        if (dup2(pipes[command_index][1], STDOUT_FILENO) < 0) {
+            return -1;
+        }
+    }
+    return 0;
 }
-
-pid_t spawn_pipe_child(int pipefd[2], char *args[], redirect_fn redirect) {
+static pid_t spawn_pipe_child(int pipes[][2], int pipe_count, int command_index, char *args[]) {
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -64,47 +65,83 @@ pid_t spawn_pipe_child(int pipefd[2], char *args[], redirect_fn redirect) {
     }
 
     if (pid == 0) {
-        redirect(pipefd);
+        if (redirect_pipe_child(pipes, pipe_count, command_index) < 0) {
+            perror("dup2 failed");
+            _exit(EXIT_FAILURE);
+        }
+        close_pipeline_pipes(pipes, pipe_count);
         child(args);
-        perror("execvp failed");
-        exit(EXIT_FAILURE);
     }
-
     return pid;
 }
 
-void wait_for_pipeline(pid_t writer_pid, pid_t reader_pid) {
-    waitpid(writer_pid, NULL, 0);
-    waitpid(reader_pid, NULL, 0);
+void wait_for_pipeline(pid_t pids[], int count) {
+    for (int i = 0; i < count; i++) {
+        wait_for_child(pids[i]);
+    }
 }
 
-void execute_pipeline(char *args1[], char *args2[]) {
-    int pipefd[2];
-    if (create_pipe(pipefd) < 0) return;
+static int create_pipeline_pipes(int pipes[][2], int pipe_count) {
+    for (int i = 0; i < pipe_count; i++) {
+        if (create_pipe(pipes[i]) < 0) {
+            close_pipeline_pipes(pipes, i);
+            return -1;
+        }
+    }
+    return 0;
+}
 
-    pid_t writer_pid = spawn_pipe_child(pipefd, args1, redirect_pipe_writer);
-    pid_t reader_pid = spawn_pipe_child(pipefd, args2, redirect_pipe_reader);
+static int spawn_pipeline_children(int pipes[][2], char *args[][MAX_ARGS], int count, pid_t pids[]) {
+    int started = 0;
+    for (int i = 0; i < count; i++) {
+        pid_t pid = spawn_pipe_child(pipes, count - 1, i, args[i]);
+        if (pid < 0) {
+            break;
+        }
+        pids[started++] = pid;
+    }
+    return started;
+}
 
-    close_pipe(pipefd);
-    wait_for_pipeline(writer_pid, reader_pid);
+static int execute_pipeline(char *args[][MAX_ARGS], int count) {
+    int pipes[MAX_COMMANDS - 1][2];
+    pid_t pids[MAX_COMMANDS];
+
+    int pipe_count = count - 1;
+
+    if (create_pipeline_pipes(pipes, pipe_count) < 0) {
+        return -1;
+    }
+    int started = spawn_pipeline_children(pipes, args, count, pids);
+
+    close_pipeline_pipes(pipes, pipe_count);
+    wait_for_pipeline(pids, started);
+
+    if (started != count) {
+        return -1;
+    }
+    return 0;
 }
 
 int handle_pipeline(char *line) {
-    char *left_str = NULL;
-    char *right_str = NULL;
-
-    int status = split_on_pipe(line, &left_str, &right_str);
-    if (status <= 0) {
-        return status;
+    if (strchr(line, '|') == NULL) {
+        return 0;
     }
 
-    char *args1[MAX_ARGS];
-    char *args2[MAX_ARGS];
-    if (prepare_pipeline_args(left_str, right_str, args1, args2) < 0) {
+    char *parts[MAX_COMMANDS + 1];
+    char *args[MAX_COMMANDS][MAX_ARGS] = {0};
+
+    int count = split_on_pipes(line, parts);
+
+    if (count < 0) {
+        fprintf(stderr, "Too many pipeline commands\n");
         return -1;
     }
-
-    execute_pipeline(args1, args2);
-
+    if (prepare_pipeline_args(parts, args, count) < 0) {
+        return -1;
+    }
+    if (execute_pipeline(args, count) < 0) {
+        return -1;
+    }
     return 1;
 }
