@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <string.h>
+#include <stdbool.h>
 
 
 ///Constants for array sizes, defined for clarity and code readability
@@ -15,6 +17,7 @@
 #define MAX_ARGS 128
 #define MAX_PROMPT_LEN 256
 #define PROMPT_TEXT "\033[1;35m$hell\033[0m: "
+#define MAX_COMMANDS 10
 
 ///Enum for readable argument indices (use where required)
 enum ArgIndex
@@ -38,6 +41,7 @@ static inline void reap()
 void read_command_line(char line[]);
 void construct_shell_prompt(char shell_prompt[]);
 void parse_command(char line[], char *args[], int *argsc);
+int split_string(char *line, char *args[], int capacity, char delimiter, bool keep_empty);
 
 ///Child functions (add more as appropriate)
 typedef struct {

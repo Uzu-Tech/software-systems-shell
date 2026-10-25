@@ -1,4 +1,5 @@
 #include "s3.h"
+#include "pipes.h"
 
 int main(int argc, char *argv[]){
     ///Stores the command line input
@@ -10,8 +11,16 @@ int main(int argc, char *argv[]){
 
     for (;;) {
         read_command_line(line);
-        parse_command(line, args, &argsc);
-        launch_program(args, argsc); 
+
+        if (line[0] == '\0') {
+            continue;
+        }
+
+        if (!handle_pipeline(line)) {
+            parse_command(line, args, &argsc);
+            launch_program(args, argsc);
+        }
+            
         reap();
     }
 
