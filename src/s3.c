@@ -1,4 +1,5 @@
 #include "s3.h"
+#include "pipes.h"
 #include "child.h"
 #include "utils.h"
 #include <fcntl.h>
