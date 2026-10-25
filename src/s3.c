@@ -25,48 +25,79 @@ void read_command_line(char line[])
     line[strcspn(line, "\n")] = '\0';
 }
 
+int split_string(char *line, char *args[], int capacity, char delimiter, bool keep_empty) {
+    int count = 0;
+    
+    if (capacity < 1) {
+        return -1;
+    }
+    args[0] = NULL;
+
+    while (1) {
+        char *separator = strchr(line, delimiter);
+
+        if (separator != NULL) {
+            *separator = '\0';
+        }
+
+        if (keep_empty || *line != '\0') {
+            if (count == capacity - 1) {
+                return -1;
+            }
+
+            args[count++] = line;
+            args[count] = NULL;
+        }
+
+        if (separator == NULL) {
+            return count;
+        }
+
+        line = separator + 1;
+    }
+}
+
 void parse_command(char line[], char *args[], int *argsc)
 {
-
-    char *token = strtok(line, " "); //first space replaced with null terminator
-    *argsc = 0;
-    while (token != NULL && *argsc < MAX_ARGS - 1)
-    {
-        args[*argsc] = token;
-        (*argsc)++; 
-        token = strtok(NULL, " ");
-    }
-    
-    args[*argsc] = NULL; //args must be null terminated
+    *argsc = split_string(line, args, MAX_ARGS, ' ', false);
 }
 
 ///Launch related functions
-void child(char *args[])
-{
+void child(char *args[]) {
     if (execvp(args[0], args) < 0) {
         perror("execvp failed");
         exit(EXIT_FAILURE);
     }
 }
 
-void launch_program(char *args[], int argsc)
-{
-    pid_t rc = fork();
+void wait_for_child(pid_t pid) {
+    int status;
 
-    if (rc < 0){ 
-        perror("fork has failed");
-        return;
-    }
-    else if (rc == 0){  //child process
-        child(args);
-        exit(EXIT_FAILURE);    
-    }
-    else{ //parent process
-        int status;
-
-        if (waitpid(rc, &status, 0) == -1) {
-            handle_wait_error(rc);
-        }
+    if (waitpid(pid, &status, 0) == -1) {
+        handle_wait_error(pid);
     }
 }
 
+void launch_program(char *args[], int argsc) {
+    if (argsc < 0) {
+        fprintf(stderr, "Too many arguments\n");
+        return;
+    }
+
+    if (argsc == 0) {
+        return;
+    }
+
+    pid_t rc = fork();
+
+    if (rc < 0) {
+        perror("fork has failed");
+        return;
+    }
+    else if (rc == 0) {
+        child(args);
+    }
+    else {
+        wait_for_child(rc);
+    }
+}
