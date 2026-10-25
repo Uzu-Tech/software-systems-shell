@@ -16,6 +16,7 @@
 #define MAX_LINE 1024
 #define MAX_ARGS 128
 #define MAX_PROMPT_LEN 256
+#define PROMPT_TEXT "\033[1;35m$hell\033[0m: "
 #define MAX_COMMANDS 10
 
 ///Enum for readable argument indices (use where required)
@@ -43,7 +44,12 @@ void parse_command(char line[], char *args[], int *argsc);
 int split_string(char *line, char *args[], int capacity, char delimiter, bool keep_empty);
 
 ///Child functions (add more as appropriate)
-void child(char *args[]);
-void wait_for_child(pid_t pid);
+typedef struct {
+    char **args;
+    char* infile;
+    char* outfile;
+} ChildParams;
+
+void child(const ChildParams* params);
 ///Program launching functions (add more as appropriate)
 void launch_program(char *args[], int argsc);

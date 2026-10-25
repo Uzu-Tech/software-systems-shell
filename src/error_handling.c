@@ -1,4 +1,21 @@
 #include "error_handling.h"
+#include <stdlib.h>
+#include <errno.h>
+#include <stdio.h>
+
+void exit_on_error(int result, const char* msg) {
+    if (result < 0) {
+        perror(msg);
+        exit(EXIT_FAILURE);
+    }
+}
+
+void exit_on_null(const void* result, const char* msg) {
+    if (result == NULL) {
+        perror(msg);
+        exit(EXIT_FAILURE);
+    }
+}
 
 void handle_wait_error(pid_t child_pid) {
     switch (errno) {
@@ -18,13 +35,11 @@ void handle_wait_error(pid_t child_pid) {
 }
 
 void handle_child_error(int status){
-    if(WIFEXITED(status)) {
-        int exit_code = WEXITSTATUS(status);
-        if (exit_code != 0) {
-            fprintf(stderr, "Process failed with exit code %d", exit_code);
-        }
-        else if (WIFSIGNALED(status)){
-            fprintf(stderr, "Process was killed by a signal %d\n", exit_code);
-        }
+    int exit_code = WEXITSTATUS(status);
+    if (exit_code != 0) {
+        fprintf(stderr, "Process failed with exit code %d", exit_code);
+    }
+    else if (WIFSIGNALED(status)){
+        fprintf(stderr, "Process was killed by a signal %d\n", exit_code);
     }
 }
