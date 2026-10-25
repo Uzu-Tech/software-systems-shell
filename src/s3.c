@@ -57,11 +57,12 @@ int split_string(char *line, char *args[], int capacity, char delimiter, bool ke
     }
 }
 
-void parse_command(char line[], char *args[], int *argsc)
-{
+void parse_command(char line[], char *args[], int *argsc) {
     *argsc = split_string(line, args, MAX_ARGS, ' ', false);
+    if (*argsc < 0) {
+        *argsc = MAX_ARGS - 1;
+    }
 }
-
 ///Launch related functions
 void child(char *args[]) {
     if (execvp(args[0], args) < 0) {
