@@ -1,4 +1,5 @@
 #include "s3.h"
+#include "pipes.h"
 
 int main(int argc, char *argv[]){
 
@@ -12,10 +13,15 @@ int main(int argc, char *argv[]){
     while (1) {
         read_command_line(line);
 
-        parse_command(line, args, &argsc);
+        if (line[0] == '\0') {
+            continue;
+        }
 
-        launch_program(args, argsc); 
-
+        if (!handle_pipeline(line)) {
+            parse_command(line, args, &argsc);
+            launch_program(args, argsc);
+            }
+            
         reap();
     }
 
