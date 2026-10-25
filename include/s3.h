@@ -46,3 +46,5 @@ void launch_program(char *args[], int argsc);
 
 void run_cd(char *args[], int argsc, char *lwd);
 bool is_cd(char **args);
+
+int handle_batch(char *line, char *lwd);

@@ -1,6 +1,5 @@
 #include "s3.h"
 #include "pipes.h"
-#include "batch.h"
 #include "cd.h"
 
 int main(int argc, char *argv[]){
