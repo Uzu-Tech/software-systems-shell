@@ -15,21 +15,21 @@ void redirect(int prev_fd, int new_fd) {
 
 void redirect_stdin(const char* infile) {
     AUTO_CLOSE int fd = open(infile, O_RDONLY);
-    handle_negative_error(fd, "Failed to open input file");
+    exit_on_error(fd, "Failed to open input file");
     redirect(STDIN_FILENO, fd);
 }
 
 void redirect_stdout(const char* outfile) {
     AUTO_CLOSE int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    handle_negative_error(fd, "Failed to open output file");
+    exit_on_error(fd, "Failed to open output file");
     redirect(STDOUT_FILENO, fd);
 }
 
-bool str_is_equal(const char* s1, const char* s2) {
+static bool str_is_equal(const char* s1, const char* s2) {
     return strcmp(s1, s2) == 0;
 }
 
-void remove_two_args(char *args[], int index) {
+static void remove_two_args(char *args[], int index) {
     int j = index;
     while (args[j + 2] != NULL) {
         args[j] = args[j + 2];
@@ -38,22 +38,22 @@ void remove_two_args(char *args[], int index) {
     args[j] = NULL;
 }
 
+static void extract_redirect_file(char** file, char* args[], int i) {
+    *file = args[i + 1];
+    exit_on_null(file, "No file specified after redirection operator");
+    remove_two_args(args, i);
+}
+
 void extract_redirect(char* args[], char** infile, char** outfile) {
     int i = 0;
     
     while (args[i] != NULL) { 
         if (str_is_equal(args[i], "<")) {
-            *infile = args[i + 1];
-            handle_null_error(*infile, "No file specified after < operator");
-            remove_two_args(args, i);
+            extract_redirect_file(infile, args, i);
         }
-
         else if (str_is_equal(args[i], ">")) {
-            *outfile = args[i + 1];
-            handle_null_error(*outfile, "No file specified after > operator");
-            remove_two_args(args, i);
+            extract_redirect_file(outfile, args, i);
         }
-        
         else {
             i++;
         }
