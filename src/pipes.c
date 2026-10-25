@@ -1,22 +1,19 @@
 #include "pipes.h"
+#include "redirect.h"
+#include "child.h"
+#include "utils.h"
+#include "s3.h"
+#include <stdio.h>
+#include <string.h>
 
-static int split_on_pipes(char *line, char *parts[]) {
-    return split_string(line, parts, MAX_COMMANDS + 1, '|', true);
-}
-
-static int prepare_pipeline_args(char *parts[], char *args[][MAX_ARGS], int count) {
+static int prepare_pipeline_args(char *cmds[], char *args[][MAX_ARGS], int count) {
     for (int i = 0; i < count; i++) {
         int argsc = 0;
 
-        parse_command(parts[i], args[i], &argsc);
+        parse_command(cmds[i], args[i], &argsc);
 
         if (argsc < 0) {
             fprintf(stderr, "Too many arguments in pipeline command\n");
-            return -1;
-        }
-
-        if (argsc == 0) {
-            fprintf(stderr, "Syntax error: missing command near '|'\n");
             return -1;
         }
     }
@@ -43,20 +40,17 @@ static void close_pipeline_pipes(int pipes[][2], int count) {
     }
 }
 
-static int redirect_pipe_child(int pipes[][2], int pipe_count, int command_index) {
-    if (command_index > 0) {
-        if (dup2(pipes[command_index - 1][0], STDIN_FILENO) < 0) {
-            return -1;
-        }
+static void fill_pipe_fd(int pipes[][2], int pipe_count, int cmd_idx, int *in_fd, int *out_fd) {
+    if (cmd_idx > 0) {
+        *in_fd = pipes[cmd_idx - 1][0];
     }
-    if (command_index < pipe_count) {
-        if (dup2(pipes[command_index][1], STDOUT_FILENO) < 0) {
-            return -1;
-        }
+
+    if (cmd_idx < pipe_count) {
+        *out_fd = pipes[cmd_idx][1];
     }
-    return 0;
 }
-static pid_t spawn_pipe_child(int pipes[][2], int pipe_count, int command_index, char *args[]) {
+
+static pid_t spawn_pipe_child(int pipes[][2], int pipe_count, int cmd_idx, char *args[]) {
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -64,14 +58,36 @@ static pid_t spawn_pipe_child(int pipes[][2], int pipe_count, int command_index,
         return -1;
     }
 
-    if (pid == 0) {
-        if (redirect_pipe_child(pipes, pipe_count, command_index) < 0) {
-            perror("dup2 failed");
-            _exit(EXIT_FAILURE);
+    if (is_child(pid)) {
+        ChildParams params = {
+            .args = args,
+            .in_fd = -1,
+            .out_fd = -1
+        };
+
+        if (cmd_idx == 0) {
+            char* infile = NULL;
+            extract_redirect(args, &infile, NULL);
+            params.in_fd = (infile != NULL) ? open_infile(infile) : -1;
+        }
+
+        if (cmd_idx == pipe_count) {
+            char* outfile = NULL;
+            extract_redirect(args, NULL, &outfile);
+            params.out_fd = (outfile != NULL) ? open_outfile(outfile) : -1;
+        }
+
+        fill_pipe_fd(pipes, pipe_count, cmd_idx, &params.in_fd, &params.out_fd);
+        if (params.in_fd != -1) {
+            redirect(STDIN_FILENO, params.in_fd);
+        }
+        if (params.out_fd != -1) {
+            redirect(STDOUT_FILENO, params.out_fd);
         }
         close_pipeline_pipes(pipes, pipe_count);
-        child(args);
+        execute_program(params.args);
     }
+
     return pid;
 }
 
@@ -91,33 +107,36 @@ static int create_pipeline_pipes(int pipes[][2], int pipe_count) {
     return 0;
 }
 
-static int spawn_pipeline_children(int pipes[][2], char *args[][MAX_ARGS], int count, pid_t pids[]) {
-    int started = 0;
-    for (int i = 0; i < count; i++) {
-        pid_t pid = spawn_pipe_child(pipes, count - 1, i, args[i]);
+static int spawn_pipeline_children(int pipes[][2], char *args[][MAX_ARGS], int command_count, pid_t pids[]) {
+    int pipe_count = command_count - 1;
+    int num_children = 0;
+    for (int i = 0; i < command_count; i++) {
+        pid_t pid = spawn_pipe_child(pipes, pipe_count, i, args[i]);
         if (pid < 0) {
             break;
         }
-        pids[started++] = pid;
+        pids[num_children] = pid;
+        num_children++;
     }
-    return started;
+    return num_children;
 }
 
 static int execute_pipeline(char *args[][MAX_ARGS], int count) {
     int pipes[MAX_COMMANDS - 1][2];
     pid_t pids[MAX_COMMANDS];
 
+    // Ignore NULL terminator at the end
     int pipe_count = count - 1;
 
     if (create_pipeline_pipes(pipes, pipe_count) < 0) {
         return -1;
     }
-    int started = spawn_pipeline_children(pipes, args, count, pids);
+    int num_children = spawn_pipeline_children(pipes, args, count, pids);
 
     close_pipeline_pipes(pipes, pipe_count);
-    wait_for_pipeline(pids, started);
+    wait_for_pipeline(pids, num_children);
 
-    if (started != count) {
+    if (num_children != count) {
         return -1;
     }
     return 0;
@@ -128,20 +147,23 @@ int handle_pipeline(char *line) {
         return 0;
     }
 
-    char *parts[MAX_COMMANDS + 1];
+    char *cmds[MAX_COMMANDS + 1];
     char *args[MAX_COMMANDS][MAX_ARGS] = {0};
 
-    int count = split_on_pipes(line, parts);
+    int cmd_count = split_string(line, cmds, MAX_COMMANDS + 1, '|');
 
-    if (count < 0) {
+    if (cmd_count < 0) {
         fprintf(stderr, "Too many pipeline commands\n");
         return -1;
     }
-    if (prepare_pipeline_args(parts, args, count) < 0) {
+
+    if (prepare_pipeline_args(cmds, args, cmd_count) < 0) {
         return -1;
     }
-    if (execute_pipeline(args, count) < 0) {
+
+    if (execute_pipeline(args, cmd_count) < 0) {
         return -1;
     }
+
     return 1;
 }

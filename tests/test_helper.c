@@ -1,4 +1,5 @@
 #include "test_helper.h"
+#include "child.h"
 #include "s3.h"
 
 int run_child_and_get_exit_code(char *args[], int argsc)
@@ -8,8 +9,8 @@ int run_child_and_get_exit_code(char *args[], int argsc)
 
     ChildParams params = {
         .args = args,
-        .infile = NULL,
-        .outfile = NULL
+        .in_fd = -1,
+        .out_fd = -1
     };
 
     if (pid == 0) {

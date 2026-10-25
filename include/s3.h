@@ -41,15 +41,5 @@ static inline void reap()
 void read_command_line(char line[]);
 void construct_shell_prompt(char shell_prompt[]);
 void parse_command(char line[], char *args[], int *argsc);
-int split_string(char *line, char *args[], int capacity, char delimiter, bool keep_empty);
-
-///Child functions (add more as appropriate)
-typedef struct {
-    char **args;
-    char* infile;
-    char* outfile;
-} ChildParams;
-
-void child(const ChildParams* params);
 ///Program launching functions (add more as appropriate)
 void launch_program(char *args[], int argsc);

@@ -1,28 +1,35 @@
 #include "redirect.h"
 #include "error_handling.h"
+#include <fcntl.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "utils.h"
 
 void redirect(int prev_fd, int new_fd) {
+    if (prev_fd == new_fd) {
+        return;
+    }
+
     if (dup2(new_fd, prev_fd) < 0) {
         perror("Dup2 syscall failed");
         exit(EXIT_FAILURE);
     }
+
+    close(new_fd);
 }
 
-void redirect_stdin(const char* infile) {
-    AUTO_CLOSE int fd = open(infile, O_RDONLY);
+int open_infile(const char *infile) {
+    int fd = open(infile, O_RDONLY);
     exit_on_error(fd, "Failed to open input file");
-    redirect(STDIN_FILENO, fd);
+    return fd;
 }
 
-void redirect_stdout(const char* outfile) {
-    AUTO_CLOSE int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+int open_outfile(const char *infile) {
+    int fd = open(infile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     exit_on_error(fd, "Failed to open output file");
-    redirect(STDOUT_FILENO, fd);
+    return fd;
 }
 
 static bool str_is_equal(const char* s1, const char* s2) {
@@ -39,8 +46,9 @@ static void remove_two_args(char *args[], int index) {
 }
 
 static void extract_redirect_file(char** file, char* args[], int i) {
+    if (file == NULL) return;
     *file = args[i + 1];
-    exit_on_null(file, "No file specified after redirection operator");
+    exit_on_null(*file, "No file specified after redirection operator");
     remove_two_args(args, i);
 }
 
