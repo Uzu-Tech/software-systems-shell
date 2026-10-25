@@ -15,7 +15,7 @@
 ///Constants for array sizes, defined for clarity and code readability
 #define MAX_LINE 1024
 #define MAX_ARGS 128
-#define MAX_PROMPT_LEN 256
+#define MAX_PROMPT_LEN PATH_MAX
 #define PROMPT_TEXT "\033[1;35m$hell\033[0m: "
 #define MAX_COMMANDS 10
 
@@ -43,3 +43,6 @@ void construct_shell_prompt(char shell_prompt[]);
 void parse_command(char line[], char *args[], int *argsc);
 ///Program launching functions (add more as appropriate)
 void launch_program(char *args[], int argsc);
+
+void run_cd(char *args[], int argsc, char *lwd);
+bool is_cd(char **args);
