@@ -1,48 +1,16 @@
 #include "utils.h"
-#include "pipes.h"
-#include "s3.h"
-#include <string.h>
+#include "error.h"
 
-static inline bool does_exist(char *separator) { return separator != NULL; }
-
-int split_string(char *line, char *args[], int capacity, char delimiter) {
-    int count = 0;
-
-    if (capacity < 1) {
-        return -1;
+Result redirect(int prev_fd, int new_fd) {
+    if (prev_fd == new_fd) {
+        return result_ok();
     }
 
-    args[0] = NULL;
-
-    while (line != NULL) {
-        char *separator = strchr(line, delimiter);
-        if (does_exist(separator)) {
-            *separator = '\0';
-        }
-
-        if (*line != '\0') {
-            if (count >= capacity - 1) {
-                args[count] = NULL;
-                return -1;
-            }
-            args[count++] = line;
-            args[count] = NULL;
-        }
-
-        line = does_exist(separator) ? separator + 1 : NULL;
-    }
-
-    return count;
+    RETURN_ON_SYS_ERR(dup2(new_fd, prev_fd), ERR_DUP2);
+    return result_ok();
 }
 
-void execute_line(char *line, char *lwd) {
-    if (!handle_pipeline(line)) {
-        
-        char *args[MAX_ARGS] = {0};
-        int argsc = 0;
-        parse_command(line, args, &argsc);
-        if (args[0] == NULL) { return;}
-        if (is_cd(args)) { run_cd(args, argsc, lwd);}
-        else { launch_program(args, argsc);}
-    }
+Result redirect_stdio(int in_fd, int out_fd) {
+    RETURN_IF_ERR(redirect(STDIN_FILENO, in_fd));
+    return redirect(STDOUT_FILENO, out_fd);
 }

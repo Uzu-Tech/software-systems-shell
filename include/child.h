@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include "error.h"
 
 typedef struct {
     char **args;
@@ -13,6 +14,5 @@ typedef struct {
 } ChildParams;
 
 bool is_child(int rc);
-void wait_for_child(pid_t pid);
-void execute_program(char* args[]);
-void child(const ChildParams* params);
+Result reap_child(pid_t pid);
+Result exec_program(const ChildParams* params);

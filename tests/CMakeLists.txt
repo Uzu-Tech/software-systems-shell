@@ -8,7 +8,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(criterion)
 
-add_executable(test_main test_s3.c test_helper.c)
+add_executable(test_main test_shell.c test_lexer.c test_parser.c test_helper.c)
 target_link_libraries(test_main PRIVATE s3 criterion)
 
 add_test(NAME UnitTests COMMAND test_main)
