@@ -1,33 +1,27 @@
 #include "child.h"
-#include "redirect.h"
-#include "error_handling.h"
+#include "error.h"
+#include "errno.h"
+#include "utils.h"
 #include <unistd.h>
 
 bool is_child(int rc) {
     return rc == 0;
 }
 
-void execute_program(char* args[]) {
-    exit_on_error(execvp(args[0], args), "execvp failed");
+Result exec_program(const ChildParams* params) {
+    RETURN_IF_ERR(redirect_stdio(params->in_fd, params->out_fd));
+    int rc = execvp(params->args[0], params->args);
+    return (Result){ .type = ERR_EXEC, .err_num = errno, .context = params->args[0] };
 }
 
-///Launch related functions
-void child(const ChildParams* params)
-{
-    if (params->in_fd != -1) {
-        redirect(STDIN_FILENO, params->in_fd);
-    }
-    if (params->out_fd != -1) {
-        redirect(STDOUT_FILENO, params->out_fd);
-    }
-
-    execute_program(params->args);
-}
-
-void wait_for_child(pid_t pid) {
+Result reap_child(pid_t pid) {
     int status;
+    pid_t rc;
 
-    if (waitpid(pid, &status, 0) == -1) {
-        handle_wait_error(pid);
-    }
+    do {
+        rc = waitpid(pid, &status, 0);
+    } while (rc < 0 && errno == EINTR);   // interrupted: retry, not an error
+
+    RETURN_ON_SYS_ERR(rc, ERR_WAIT);
+    return get_child_result(status);
 }

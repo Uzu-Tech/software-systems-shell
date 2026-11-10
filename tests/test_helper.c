@@ -1,21 +1,20 @@
 #include "test_helper.h"
-#include "child.h"
-#include "s3.h"
+#include "error.h"
 
-int run_child_and_get_exit_code(char *args[], int argsc)
+int run_program_and_get_exit_code(char *args[])
 {
     pid_t pid = fork();
     cr_assert_neq(pid, -1, "fork failed");
 
     ChildParams params = {
         .args = args,
-        .in_fd = -1,
-        .out_fd = -1
+        .in_fd = STDIN_FILENO,
+        .out_fd = STDOUT_FILENO
     };
 
     if (pid == 0) {
-        child(&params);
-        _exit(99);  // Detect an unexpected return from child().
+        Result result = exec_program(&params);
+        _exit(is_error(result) ? EXIT_FAILURE : result.exit_code);
     }
 
     int status;

@@ -1,22 +1,22 @@
 #include "cd.h"
-#include "s3.h"
+#include "shell.h"
+#include "error.h"
+#include <linux/limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
 #include <unistd.h>
 
+char lwd[PATH_MAX] = "";
 
-static bool save_cd (char *current_dir) {
-    if (getcwd(current_dir, PATH_MAX) == NULL) {
-        perror("cd: getcwd failed");
-        return false;
-    }
-    return true;
+static Result save_cd(char *current_dir) {
+    RETURN_ON_NULL_ERR(getcwd(current_dir, PATH_MAX), ERR_CD);
+    return result_ok();
 }
 
-static char *set_cd_argument(char *args[], int argsc, char *lwd) {
-    if (argsc == 1) {
+static char *get_cd_argument(char *args[], char *lwd) {
+    if (args[1] == NULL) {
         return getenv("HOME");
     } 
     if (strcmp(args[1], "-") == 0) {
@@ -25,19 +25,19 @@ static char *set_cd_argument(char *args[], int argsc, char *lwd) {
     return args[1];
 }
 
-static void set_cd(const char *target_dir, const char *current_dir, char *lwd) {
-    if (chdir(target_dir) == 0) {
-        strncpy(lwd, current_dir, PATH_MAX - 1);
-        lwd[PATH_MAX - 1] = '\0';
-    }
+static Result set_cd(const char *target_dir, const char *current_dir, char *lwd) {
+    RETURN_ON_SYS_ERR(chdir(target_dir), ERR_CD);
+    strncpy(lwd, current_dir, PATH_MAX - 1);
+    lwd[PATH_MAX - 1] = '\0';
+    return result_ok();
 }
 
-void run_cd(char *args[], int argsc, char *lwd) {
+Result run_cd(char *args[], char *lwd) {
     char current_dir[PATH_MAX];
-    if (!save_cd(current_dir)) return;
-    char *target_dir = set_cd_argument(args, argsc, lwd);
-    if (target_dir == NULL) return;
-    set_cd(target_dir, current_dir, lwd);  
+    RETURN_IF_ERR(save_cd(current_dir));
+    char *target_dir = get_cd_argument(args, lwd);
+    if (target_dir == NULL) return result_ok();
+    return set_cd(target_dir, current_dir, lwd);  
 }
 
 bool is_cd(char **args) {

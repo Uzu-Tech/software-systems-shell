@@ -6,9 +6,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-#include "s3.h"
+#include "child.h"
 
-
-int run_child_and_get_exit_code(char *args[], int argsc);
+int run_program_and_get_exit_code(char *args[]);
 
 void provide_input(const char *text);
