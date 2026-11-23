@@ -34,7 +34,6 @@ typedef struct {
 typedef struct {
     ASTNode** children;
     int count;
-    int results_slot; // shared mmap region for pipeline child results
 } Pipeline;
 
 typedef struct {

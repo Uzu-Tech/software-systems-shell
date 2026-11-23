@@ -14,8 +14,6 @@
 #define PARSE_RETURN_IF_NULL(node) \
     do { if ((node) == NODE_NULL) return NODE_NULL; } while (0)
 
-int pipeline_results_slot = 0;
-
 ASTNode* parse_error(ParserContext* ctx, const char* msg) {
     ctx->err_msg = msg;
     return NODE_ERR;
@@ -126,7 +124,6 @@ ASTNode* parse_pipeline(ParserContext* ctx) {
     pipeline->children = (ASTNode**)alloc_pointer(ctx->arena, MAX_COMMANDS, sizeof(ASTNode*));
     PARSE_REQUIRE(ctx, pipeline->children != NULL, OOM_ERR_MSG);
     pipeline->children[0] = first_cmd;
-    pipeline->results_slot = pipeline_results_slot++;
     
     pipeline->count = 1;
     while (token.type == TOKEN_PIPE) {
